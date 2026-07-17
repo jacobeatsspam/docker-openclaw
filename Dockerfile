@@ -147,8 +147,9 @@ ENV NODE_LLAMA_CPP_CMAKE_OPTION_GGML_CUDA=OFF
 ENV NODE_LLAMA_CPP_CMAKE_OPTION_GGML_HIP=OFF
 ENV NODE_LLAMA_CPP_CMAKE_OPTION_GGML_VULKAN=OFF
 ENV NODE_LLAMA_CPP_GPU="false"
-RUN --mount=type=cache,id=docker-openclaw-pnpm-store,target=/home/node/.local/share/pnpm/store,sharing=locked \
+RUN --mount=type=cache,id=docker-openclaw-pnpm-store,target=/home/node/.local/share/pnpm/store,sharing=locked,uid=1000,gid=1000,mode=0775 \
 	set -exuo pipefail \
+	&& mkdir -p /home/node/.local/share/pnpm/global \
 	&& pnpm config set package-import-method copy \
 	&& pnpm config set global-bin-dir ${HOME}/.local/bin \
 	&& pnpm install -g --child-concurrency=1 --allow-build=better-sqlite3 --allow-build=node-llama-cpp @tobilu/qmd \
@@ -169,7 +170,7 @@ WORKDIR ${HOME}/openclaw
 
 ENV NODE_ENV=production
 ENV OPENCLAW_PREFER_PNPM=1
-RUN --mount=type=cache,id=docker-openclaw-pnpm-store,target=/home/node/.local/share/pnpm/store,sharing=locked \
+RUN --mount=type=cache,id=docker-openclaw-pnpm-store,target=/home/node/.local/share/pnpm/store,sharing=locked,uid=1000,gid=1000,mode=0775 \
 	set -exuo pipefail \
 	&& export NODE_OPTIONS='--max-old-space-size=2048' \
 	&& pnpm install --frozen-lockfile \
@@ -189,7 +190,7 @@ ENV PATH="${HOME}/openclaw/node_modules/.bin:${PATH}"
 
 # Strip dev dependencies and build artifacts to match upstream runtime layout.
 # Whitelist approach: keep only what runtime needs, delete everything else.
-RUN --mount=type=cache,id=docker-openclaw-pnpm-store,target=/home/node/.local/share/pnpm/store,sharing=locked \
+RUN --mount=type=cache,id=docker-openclaw-pnpm-store,target=/home/node/.local/share/pnpm/store,sharing=locked,uid=1000,gid=1000,mode=0775 \
 	set -exuo pipefail \
 	&& CI=true NPM_CONFIG_FROZEN_LOCKFILE=false pnpm prune --prod \
 	&& find dist -type f \( -name '*.d.ts' -o -name '*.d.mts' -o -name '*.d.cts' -o -name '*.map' \) -delete \
