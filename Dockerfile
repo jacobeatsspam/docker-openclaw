@@ -106,6 +106,15 @@ RUN set -exuo pipefail \
 	&& corepack prepare pnpm@latest --activate \
 	&& chmod -R a+rwX "$COREPACK_HOME"
 
+# Pre-create the non-root pnpm directories while still root so later global
+# installs do not depend on BuildKit cache-mount ownership behavior.
+RUN set -exuo pipefail \
+	&& install -d -o node -g node -m 0775 \
+		/home/node/.local/bin \
+		/home/node/.local/share/pnpm \
+		/home/node/.local/share/pnpm/store \
+		/home/node/.local/share/pnpm/global
+
 RUN chown -R node:node /home/node
 USER node
 ENV HOME="/home/node"
@@ -147,9 +156,7 @@ ENV NODE_LLAMA_CPP_CMAKE_OPTION_GGML_CUDA=OFF
 ENV NODE_LLAMA_CPP_CMAKE_OPTION_GGML_HIP=OFF
 ENV NODE_LLAMA_CPP_CMAKE_OPTION_GGML_VULKAN=OFF
 ENV NODE_LLAMA_CPP_GPU="false"
-RUN --mount=type=cache,id=docker-openclaw-pnpm-store,target=/home/node/.local/share/pnpm/store,sharing=locked,uid=1000,gid=1000,mode=0775 \
-	set -exuo pipefail \
-	&& mkdir -p /home/node/.local/share/pnpm/global \
+RUN set -exuo pipefail \
 	&& pnpm config set package-import-method copy \
 	&& pnpm config set global-bin-dir ${HOME}/.local/bin \
 	&& pnpm install -g --child-concurrency=1 --allow-build=better-sqlite3 --allow-build=node-llama-cpp @tobilu/qmd \
