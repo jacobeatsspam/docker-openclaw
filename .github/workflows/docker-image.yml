@@ -28,6 +28,14 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
+      - name: Free runner disk space
+        run: |
+          set -euo pipefail
+          sudo rm -rf /usr/local/lib/android || true
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /opt/ghc || true
+          docker system prune -af || true
+
       - name: Derive OpenClaw tag from Dockerfile
         id: openclaw
         shell: bash
@@ -67,13 +75,27 @@ jobs:
           labels: |
             org.opencontainers.image.version=${{ steps.openclaw.outputs.tag }}
 
-      - name: Build image
+      - name: Build image (pull request)
+        if: github.event_name == 'pull_request'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            OPENCLAW_TAG=${{ steps.openclaw.outputs.tag }}
+
+      - name: Build and push image
+        if: github.event_name != 'pull_request'
         uses: docker/build-push-action@v7
         with:
           context: .
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
