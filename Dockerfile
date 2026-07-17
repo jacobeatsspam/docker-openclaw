@@ -147,7 +147,8 @@ ENV NODE_LLAMA_CPP_CMAKE_OPTION_GGML_CUDA=OFF
 ENV NODE_LLAMA_CPP_CMAKE_OPTION_GGML_HIP=OFF
 ENV NODE_LLAMA_CPP_CMAKE_OPTION_GGML_VULKAN=OFF
 ENV NODE_LLAMA_CPP_GPU="false"
-RUN set -exuo pipefail \
+RUN --mount=type=cache,id=docker-openclaw-pnpm-store,target=/home/node/.local/share/pnpm/store,sharing=locked \
+	set -exuo pipefail \
 	&& pnpm config set package-import-method copy \
 	&& pnpm config set global-bin-dir ${HOME}/.local/bin \
 	&& pnpm install -g --child-concurrency=1 --allow-build=better-sqlite3 --allow-build=node-llama-cpp @tobilu/qmd \
@@ -168,7 +169,8 @@ WORKDIR ${HOME}/openclaw
 
 ENV NODE_ENV=production
 ENV OPENCLAW_PREFER_PNPM=1
-RUN set -exuo pipefail \
+RUN --mount=type=cache,id=docker-openclaw-pnpm-store,target=/home/node/.local/share/pnpm/store,sharing=locked \
+	set -exuo pipefail \
 	&& export NODE_OPTIONS='--max-old-space-size=2048' \
 	&& pnpm install --frozen-lockfile \
 	&& (pnpm canvas:a2ui:bundle \
@@ -187,7 +189,8 @@ ENV PATH="${HOME}/openclaw/node_modules/.bin:${PATH}"
 
 # Strip dev dependencies and build artifacts to match upstream runtime layout.
 # Whitelist approach: keep only what runtime needs, delete everything else.
-RUN set -exuo pipefail \
+RUN --mount=type=cache,id=docker-openclaw-pnpm-store,target=/home/node/.local/share/pnpm/store,sharing=locked \
+	set -exuo pipefail \
 	&& CI=true NPM_CONFIG_FROZEN_LOCKFILE=false pnpm prune --prod \
 	&& find dist -type f \( -name '*.d.ts' -o -name '*.d.mts' -o -name '*.d.cts' -o -name '*.map' \) -delete \
 	&& chmod 750 openclaw.mjs \
