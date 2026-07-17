@@ -106,6 +106,15 @@ RUN set -exuo pipefail \
 	&& corepack prepare pnpm@latest --activate \
 	&& chmod -R a+rwX "$COREPACK_HOME"
 
+# Pre-create the non-root pnpm directories while still root so later global
+# installs do not depend on BuildKit cache-mount ownership behavior.
+RUN set -exuo pipefail \
+	&& install -d -o node -g node -m 0775 \
+		/home/node/.local/bin \
+		/home/node/.local/share/pnpm \
+		/home/node/.local/share/pnpm/store \
+		/home/node/.local/share/pnpm/global
+
 RUN chown -R node:node /home/node
 USER node
 ENV HOME="/home/node"
@@ -156,11 +165,10 @@ RUN set -exuo pipefail \
 
 # Install Python tools
 RUN set -exuo pipefail \
-	&& pipx install "git+https://github.com/truenas/api_client.git@TS-25.10.3" \
-	&& pipx install openai-whisper
+	&& pipx install "git+https://github.com/truenas/api_client.git@TS-25.10.3"
 
 # Clone openclaw
-ARG OPENCLAW_TAG
+ARG OPENCLAW_TAG="2026.5.4"
 RUN set -exuo pipefail \
 	&& git clone --branch "v${OPENCLAW_TAG}" --depth 1 \
 		https://github.com/openclaw/openclaw
@@ -169,7 +177,8 @@ WORKDIR ${HOME}/openclaw
 
 ENV NODE_ENV=production
 ENV OPENCLAW_PREFER_PNPM=1
-RUN set -exuo pipefail \
+RUN --mount=type=cache,id=docker-openclaw-pnpm-store,target=/home/node/.local/share/pnpm/store,sharing=locked,uid=1000,gid=1000,mode=0775 \
+	set -exuo pipefail \
 	&& export NODE_OPTIONS='--max-old-space-size=2048' \
 	&& pnpm install --frozen-lockfile \
 	&& (pnpm canvas:a2ui:bundle \
@@ -188,7 +197,8 @@ ENV PATH="${HOME}/openclaw/node_modules/.bin:${PATH}"
 
 # Strip dev dependencies and build artifacts to match upstream runtime layout.
 # Whitelist approach: keep only what runtime needs, delete everything else.
-RUN set -exuo pipefail \
+RUN --mount=type=cache,id=docker-openclaw-pnpm-store,target=/home/node/.local/share/pnpm/store,sharing=locked,uid=1000,gid=1000,mode=0775 \
+	set -exuo pipefail \
 	&& CI=true NPM_CONFIG_FROZEN_LOCKFILE=false pnpm prune --prod \
 	&& find dist -type f \( -name '*.d.ts' -o -name '*.d.mts' -o -name '*.d.cts' -o -name '*.map' \) -delete \
 	&& chmod 750 openclaw.mjs \

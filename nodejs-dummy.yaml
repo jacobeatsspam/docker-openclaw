@@ -1,0 +1,11 @@
+# Debian package shim used during image build.
+# OpenClaw's runtime base image already provides Node.js, but some apt dependencies
+# still require a `nodejs` package to exist in dpkg metadata. We build and install
+# this no-op package before apt install so those dependencies can resolve without
+# replacing the upstream Node.js runtime already present in the base image.
+Section: misc
+Priority: optional
+Standards-Version: 3.9.2
+Package: nodejs
+Version: 99:1.0
+Description: Fake nodejs package to satisfy apt dependencies
