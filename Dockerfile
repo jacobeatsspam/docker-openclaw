@@ -156,8 +156,7 @@ RUN set -exuo pipefail \
 
 # Install Python tools
 RUN set -exuo pipefail \
-	&& pipx install "git+https://github.com/truenas/api_client.git@TS-25.10.3" \
-	&& pipx install openai-whisper
+	&& pipx install "git+https://github.com/truenas/api_client.git@TS-25.10.3"
 
 # Clone openclaw
 ARG OPENCLAW_TAG="2026.5.4"
