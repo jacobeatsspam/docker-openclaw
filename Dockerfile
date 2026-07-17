@@ -160,7 +160,7 @@ RUN set -exuo pipefail \
 	&& pipx install openai-whisper
 
 # Clone openclaw
-ARG OPENCLAW_TAG
+ARG OPENCLAW_TAG="2026.5.4"
 RUN set -exuo pipefail \
 	&& git clone --branch "v${OPENCLAW_TAG}" --depth 1 \
 		https://github.com/openclaw/openclaw
