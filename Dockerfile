@@ -51,6 +51,7 @@ RUN set -exuo pipefail \
 		clang-tools \
 		cmake \
 		curl \
+		dnsutils \
 		docker-ce-cli \
 		docker-compose-plugin \
 		ffmpeg \
@@ -59,6 +60,8 @@ RUN set -exuo pipefail \
 		git \
 		gnupg \
 		hostname \
+		iproute2 \
+		iputils-ping \
 		jq \
 		libsqlite3-dev \
 		lsof \
