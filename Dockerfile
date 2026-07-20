@@ -4,6 +4,8 @@
 # and replace the digest below with the current multi-arch manifest list entry.
 ARG OPENCLAW_NODE_BOOKWORM_IMAGE="node:24-bookworm"
 ARG OPENCLAW_NODE_BOOKWORM_DIGEST="sha256:3a09aa6354567619221ef6c45a5051b671f953f0a1924d1f819ffb236e520e6b"
+ARG GOGCLI_VERSION="0.34.1"
+ARG WACLI_VERSION="0.13.0"
 
 FROM ${OPENCLAW_NODE_BOOKWORM_IMAGE}@${OPENCLAW_NODE_BOOKWORM_DIGEST}
 
@@ -57,6 +59,7 @@ RUN set -exuo pipefail \
 		ffmpeg \
 		fonts-liberation \
 		fonts-noto-color-emoji \
+		gh \
 		git \
 		gnupg \
 		hostname \
@@ -98,6 +101,33 @@ RUN set -exuo pipefail \
 RUN set -exuo pipefail \
 	&& BUN_INSTALL='/usr/local' SHELL='NOSHELL' \
 		bash <(curl --retry 5 --retry-all-errors --retry-delay 2 -fsSL https://bun.sh/install)
+
+# Install standalone CLI binaries needed by bundled OpenClaw skills without
+# depending on Homebrew inside the container image.
+RUN set -exuo pipefail \
+	&& arch="$(dpkg --print-architecture)" \
+	&& case "$arch" in \
+		amd64) release_arch='linux_amd64' ;; \
+		arm64) release_arch='linux_arm64' ;; \
+		*) echo "Unsupported architecture: $arch" >&2; exit 1 ;; \
+	   esac \
+	&& tmpdir="$(mktemp -d)" \
+	&& cd "$tmpdir" \
+	&& gog_asset="gogcli_${GOGCLI_VERSION}_${release_arch}.tar.gz" \
+	&& curl -fsSLO "https://github.com/openclaw/gogcli/releases/download/v${GOGCLI_VERSION}/${gog_asset}" \
+	&& curl -fsSLO "https://github.com/openclaw/gogcli/releases/download/v${GOGCLI_VERSION}/checksums.txt" \
+	&& grep "  ${gog_asset}$" checksums.txt | sha256sum -c - \
+	&& tar -xzf "$gog_asset" gog \
+	&& install -m 0755 gog /usr/local/bin/gog \
+	&& rm -f "$gog_asset" checksums.txt gog \
+	&& wacli_asset="wacli_${WACLI_VERSION}_${release_arch}.tar.gz" \
+	&& curl -fsSLO "https://github.com/openclaw/wacli/releases/download/v${WACLI_VERSION}/${wacli_asset}" \
+	&& curl -fsSLO "https://github.com/openclaw/wacli/releases/download/v${WACLI_VERSION}/checksums.txt" \
+	&& grep "  ${wacli_asset}$" checksums.txt | sha256sum -c - \
+	&& tar -xzf "$wacli_asset" wacli \
+	&& install -m 0755 wacli /usr/local/bin/wacli \
+	&& cd / \
+	&& rm -rf "$tmpdir"
 
 # Corepack needs a shared home so the non-root node user can resolve pnpm
 # without a first-run network fetch failing on permissions.
@@ -168,7 +198,8 @@ RUN set -exuo pipefail \
 
 # Install Python tools
 RUN set -exuo pipefail \
-	&& pipx install "git+https://github.com/truenas/api_client.git@TS-25.10.3"
+	&& pipx install "git+https://github.com/truenas/api_client.git@TS-25.10.3" \
+	&& pipx install openai-whisper
 
 # Clone openclaw
 ARG OPENCLAW_TAG="2026.5.4"
