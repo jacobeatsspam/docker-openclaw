@@ -197,7 +197,8 @@ RUN set -exuo pipefail \
 	&& pnpm config set global-bin-dir ${HOME}/.local/bin \
 	&& pnpm install -g --child-concurrency=1 --allow-build=better-sqlite3 --allow-build=node-llama-cpp @tobilu/qmd \
 	&& pnpm install -g --child-concurrency=1 --allow-build=protobufjs @steipete/summarize \
-	&& pnpm install -g --child-concurrency=1 clawhub
+	&& pnpm install -g --child-concurrency=1 clawhub \
+	&& pnpm install -g --child-concurrency=1 @google/gemini-cli
 
 # Install Python tools
 RUN set -exuo pipefail \
