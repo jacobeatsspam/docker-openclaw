@@ -12,7 +12,8 @@ The repository includes `.github/workflows/docker-image.yml`.
 
 The OpenClaw version is pinned in `Dockerfile` via `ARG OPENCLAW_TAG`.
 
-On first boot, the image also seeds `plugins.entries.diffs.enabled=true` and
-`plugins.entries.lobster.enabled=true` into `openclaw.json` when those settings
-are unset, so bundled diff-viewer and Lobster support are available without
-interactive plugin installs.
+On first boot, the image also seeds `plugins.entries.diffs.enabled=true`,
+`plugins.entries.lobster.enabled=true`, and
+`plugins.entries.google-meet.enabled=true` into `openclaw.json` when those
+settings are unset, so bundled diff-viewer, Lobster, and Google Meet support
+are available without interactive plugin installs.
