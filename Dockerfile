@@ -24,6 +24,9 @@ ENV HOME="/root"
 WORKDIR "${HOME}"
 
 COPY nodejs-dummy.yaml ${HOME}/nodejs-dummy.yaml
+COPY docker-entrypoint.sh /usr/local/bin/docker-openclaw-entrypoint
+
+RUN chmod 0755 /usr/local/bin/docker-openclaw-entrypoint
 
 RUN set -exuo pipefail \
 	&& install -m 0755 -d /etc/apt/keyrings \
@@ -265,4 +268,5 @@ LABEL \
 EXPOSE 18789
 EXPOSE 9222 5900 6080
 
+ENTRYPOINT ["/usr/local/bin/docker-openclaw-entrypoint"]
 CMD ["/usr/local/bin/node", "/home/node/openclaw/openclaw.mjs", "gateway"]
