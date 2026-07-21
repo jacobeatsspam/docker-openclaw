@@ -3,14 +3,21 @@
 # To update, run: docker buildx imagetools inspect node:24-bookworm (or podman)
 # and replace the digest below with the current multi-arch manifest list entry.
 ARG OPENCLAW_NODE_BOOKWORM_IMAGE="node:24-bookworm"
-ARG OPENCLAW_NODE_BOOKWORM_DIGEST="sha256:3a09aa6354567619221ef6c45a5051b671f953f0a1924d1f819ffb236e520e6b"
+ARG OPENCLAW_NODE_BOOKWORM_DIGEST="sha256:8530f76a96d88820d288761f022e318970dda93d01536919fbc16076b7983e63"
 ARG GOGCLI_VERSION="0.34.1"
 ARG WACLI_VERSION="0.13.0"
+ARG OPENCLAW_DOCKER_BUILD_NODE_OPTIONS="--max-old-space-size=8192"
+ARG OPENCLAW_DOCKER_BUILD_TSDOWN_MAX_OLD_SPACE_MB=""
+ARG OPENCLAW_DOCKER_BUILD_SKIP_DTS=1
 
 FROM ${OPENCLAW_NODE_BOOKWORM_IMAGE}@${OPENCLAW_NODE_BOOKWORM_DIGEST}
 
 ARG GOGCLI_VERSION
 ARG WACLI_VERSION
+ARG OPENCLAW_DOCKER_BUILD_NODE_OPTIONS
+ARG OPENCLAW_DOCKER_BUILD_TSDOWN_MAX_OLD_SPACE_MB
+ARG OPENCLAW_DOCKER_BUILD_SKIP_DTS
+ARG TARGETARCH
 
 # Verify Docker apt signing key fingerprint before trusting it as a root key.
 # Update DOCKER_GPG_FINGERPRINT when Docker rotates release keys.
@@ -209,7 +216,7 @@ RUN set -exuo pipefail \
 	&& pipx install openai-whisper
 
 # Clone openclaw
-ARG OPENCLAW_TAG="2026.5.4"
+ARG OPENCLAW_TAG="2026.7.1"
 RUN set -exuo pipefail \
 	&& git clone --branch "v${OPENCLAW_TAG}" --depth 1 \
 		https://github.com/openclaw/openclaw
@@ -218,19 +225,23 @@ WORKDIR ${HOME}/openclaw
 
 ENV NODE_ENV=production
 ENV OPENCLAW_PREFER_PNPM=1
-RUN --mount=type=cache,id=docker-openclaw-pnpm-store,target=/home/node/.local/share/pnpm/store,sharing=locked,uid=1000,gid=1000,mode=0775 \
+RUN --mount=type=cache,id=docker-openclaw-pnpm-store-${OPENCLAW_TAG}-${TARGETARCH},target=/home/node/.local/share/pnpm/store,sharing=shared,uid=1000,gid=1000,mode=0775 \
 	set -exuo pipefail \
-	&& export NODE_OPTIONS='--max-old-space-size=2048' \
-	&& pnpm install --frozen-lockfile \
-	&& (pnpm canvas:a2ui:bundle \
+	&& NODE_OPTIONS='--max-old-space-size=2048' pnpm install --frozen-lockfile \
+		--config.supportedArchitectures.os=linux \
+		--config.supportedArchitectures.cpu="$(node -p 'process.arch')" \
+		--config.supportedArchitectures.libc=glibc \
+	&& (pnpm_config_verify_deps_before_run=false pnpm canvas:a2ui:bundle \
 		|| (echo "A2UI bundle: creating stub (non-fatal)" \
-			&& mkdir -p src/canvas-host/a2ui \
-			&& echo "/* A2UI bundle unavailable */" > src/canvas-host/a2ui/a2ui.bundle.js \
-			&& echo "stub" > src/canvas-host/a2ui/.bundle.hash \
+			&& mkdir -p extensions/canvas/src/host/a2ui \
+			&& echo "/* A2UI bundle unavailable in this build */" > extensions/canvas/src/host/a2ui/a2ui.bundle.js \
+			&& echo "stub" > extensions/canvas/src/host/a2ui/.bundle.hash \
 			&& rm -rf vendor/a2ui apps/shared/OpenClawKit/Tools/CanvasA2UI)) \
-	&& pnpm build:docker \
-	&& pnpm ui:build \
-	&& pnpm postinstall \
+	&& OPENCLAW_RUN_NODE_SKIP_DTS_BUILD="$OPENCLAW_DOCKER_BUILD_SKIP_DTS" \
+		OPENCLAW_TSDOWN_MAX_OLD_SPACE_MB="$OPENCLAW_DOCKER_BUILD_TSDOWN_MAX_OLD_SPACE_MB" \
+		NODE_OPTIONS="$OPENCLAW_DOCKER_BUILD_NODE_OPTIONS" \
+		pnpm_config_verify_deps_before_run=false pnpm build:docker \
+	&& pnpm_config_verify_deps_before_run=false pnpm ui:build \
 	&& ln -sf ${HOME}/openclaw/openclaw.mjs ${HOME}/.local/bin/openclaw \
 	&& echo 'export PATH="${HOME}/openclaw/node_modules/.bin:${PATH}"' >> ${HOME}/.bashrc \
 	&& echo '' >> ${HOME}/.bashrc
@@ -238,10 +249,29 @@ ENV PATH="${HOME}/openclaw/node_modules/.bin:${PATH}"
 
 # Strip dev dependencies and build artifacts to match upstream runtime layout.
 # Whitelist approach: keep only what runtime needs, delete everything else.
-RUN --mount=type=cache,id=docker-openclaw-pnpm-store,target=/home/node/.local/share/pnpm/store,sharing=locked,uid=1000,gid=1000,mode=0775 \
+RUN --mount=type=cache,id=docker-openclaw-pnpm-store-${OPENCLAW_TAG}-${TARGETARCH},target=/home/node/.local/share/pnpm/store,sharing=shared,uid=1000,gid=1000,mode=0775 \
 	set -exuo pipefail \
-	&& CI=true NPM_CONFIG_FROZEN_LOCKFILE=false pnpm prune --prod \
+	&& node scripts/list-prod-store-packages.mjs | xargs -r pnpm store add \
+	&& CI=true pnpm prune --prod \
+		--config.offline=true \
+		--config.supportedArchitectures.os=linux \
+		--config.supportedArchitectures.cpu="$(node -p 'process.arch')" \
+		--config.supportedArchitectures.libc=glibc \
+	&& node scripts/postinstall-bundled-plugins.mjs \
 	&& find dist -type f \( -name '*.d.ts' -o -name '*.d.mts' -o -name '*.d.cts' -o -name '*.map' \) -delete \
+	&& if [ -L ${HOME}/openclaw/node_modules/@openclaw/ai ]; then \
+		ai_runtime_target="$(readlink -f ${HOME}/openclaw/node_modules/@openclaw/ai)" \
+		&& ai_runtime_tmp="$(mktemp -d)" \
+		&& cp -a "$ai_runtime_target" "$ai_runtime_tmp/ai" \
+		&& rm ${HOME}/openclaw/node_modules/@openclaw/ai \
+		&& mv "$ai_runtime_tmp/ai" ${HOME}/openclaw/node_modules/@openclaw/ai \
+		&& rmdir "$ai_runtime_tmp"; \
+	fi \
+	&& rm -rf \
+		${HOME}/openclaw/node_modules/openclaw \
+		${HOME}/openclaw/node_modules/.bin/openclaw \
+		${HOME}/openclaw/node_modules/.pnpm/openclaw@*/node_modules/openclaw \
+	&& node scripts/check-package-dist-imports.mjs ${HOME}/openclaw \
 	&& chmod 750 openclaw.mjs \
 	&& rm -rf docs/ja-JP docs/zh-CN \
 	&& find . -maxdepth 1 -mindepth 1 \
