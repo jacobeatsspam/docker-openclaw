@@ -274,12 +274,15 @@ RUN --mount=type=cache,id=docker-openclaw-pnpm-store-${OPENCLAW_TAG}-${TARGETARC
 	&& node scripts/check-package-dist-imports.mjs ${HOME}/openclaw \
 	&& chmod 750 openclaw.mjs \
 	&& rm -rf docs/ja-JP docs/zh-CN \
+	&& find src -maxdepth 1 -mindepth 1 ! -name 'agents' -exec rm -rf {} + \
+	&& find src/agents -maxdepth 1 -mindepth 1 ! -name 'templates' -exec rm -rf {} + \
 	&& find . -maxdepth 1 -mindepth 1 \
 		! -name 'dist' \
 		! -name 'docs' \
 		! -name 'extensions' \
 		! -name 'node_modules' \
 		! -name 'skills' \
+		! -name 'src' \
 		! -name 'openclaw.mjs' \
 		! -name 'package.json' \
 		-exec rm -rf {} +
