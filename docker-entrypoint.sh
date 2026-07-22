@@ -20,13 +20,16 @@ if [[ -f "$CONFIG_PATH" ]]; then
     | .plugins.entries.diffs |= if has("enabled") then . else . + { enabled: true } end
     | .plugins.entries.lobster |= (. // {})
     | .plugins.entries.lobster |= if has("enabled") then . else . + { enabled: true } end
+    | .plugins.entries["google-meet"] |= (. // {})
+    | .plugins.entries["google-meet"] |= if has("enabled") then . else . + { enabled: true } end
   ' "$CONFIG_PATH" > "$tmpfile"
 else
   jq -n '{
     plugins: {
       entries: {
         diffs: { enabled: true },
-        lobster: { enabled: true }
+        lobster: { enabled: true },
+        "google-meet": { enabled: true }
       }
     }
   }' > "$tmpfile"
