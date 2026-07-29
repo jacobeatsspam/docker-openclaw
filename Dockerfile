@@ -5,6 +5,7 @@
 ARG OPENCLAW_NODE_BOOKWORM_IMAGE="node:24-bookworm"
 ARG OPENCLAW_NODE_BOOKWORM_DIGEST="sha256:8530f76a96d88820d288761f022e318970dda93d01536919fbc16076b7983e63"
 ARG GOGCLI_VERSION="0.34.1"
+ARG RTK_VERSION="v0.44.1"
 ARG WACLI_VERSION="0.13.0"
 ARG OPENCLAW_DOCKER_BUILD_NODE_OPTIONS="--max-old-space-size=8192"
 ARG OPENCLAW_DOCKER_BUILD_TSDOWN_MAX_OLD_SPACE_MB=""
@@ -13,6 +14,7 @@ ARG OPENCLAW_DOCKER_BUILD_SKIP_DTS=1
 FROM ${OPENCLAW_NODE_BOOKWORM_IMAGE}@${OPENCLAW_NODE_BOOKWORM_DIGEST}
 
 ARG GOGCLI_VERSION
+ARG RTK_VERSION
 ARG WACLI_VERSION
 ARG OPENCLAW_DOCKER_BUILD_NODE_OPTIONS
 ARG OPENCLAW_DOCKER_BUILD_TSDOWN_MAX_OLD_SPACE_MB
@@ -114,6 +116,24 @@ RUN set -exuo pipefail \
 RUN set -exuo pipefail \
 	&& BUN_INSTALL='/usr/local' SHELL='NOSHELL' \
 		bash <(curl --retry 5 --retry-all-errors --retry-delay 2 -fsSL https://bun.sh/install)
+
+RUN set -exuo pipefail \
+	&& arch="$(dpkg --print-architecture)" \
+	&& case "$arch" in \
+		amd64) rtk_target='x86_64-unknown-linux-musl' ;; \
+		arm64) rtk_target='aarch64-unknown-linux-gnu' ;; \
+		*) echo "Unsupported architecture: $arch" >&2; exit 1 ;; \
+	   esac \
+	&& tmpdir="$(mktemp -d)" \
+	&& cd "$tmpdir" \
+	&& rtk_asset="rtk-${rtk_target}.tar.gz" \
+	&& curl -fsSLO "https://github.com/rtk-ai/rtk/releases/download/${RTK_VERSION}/${rtk_asset}" \
+	&& curl -fsSLO "https://github.com/rtk-ai/rtk/releases/download/${RTK_VERSION}/checksums.txt" \
+	&& grep "  ${rtk_asset}$" checksums.txt | sha256sum -c - \
+	&& tar -xzf "$rtk_asset" rtk \
+	&& install -m 0755 rtk /usr/local/bin/rtk \
+	&& cd / \
+	&& rm -rf "$tmpdir"
 
 # Install standalone CLI binaries needed by bundled OpenClaw skills without
 # depending on Homebrew inside the container image.
@@ -242,6 +262,12 @@ RUN --mount=type=cache,id=docker-openclaw-pnpm-store-${OPENCLAW_TAG}-${TARGETARC
 		NODE_OPTIONS="$OPENCLAW_DOCKER_BUILD_NODE_OPTIONS" \
 		pnpm_config_verify_deps_before_run=false pnpm build:docker \
 	&& pnpm_config_verify_deps_before_run=false pnpm ui:build \
+	&& tmpdir="$(mktemp -d)" \
+	&& curl -fsSL "https://codeload.github.com/rtk-ai/rtk/tar.gz/refs/tags/${RTK_VERSION}" -o "$tmpdir/rtk.tar.gz" \
+	&& tar -xzf "$tmpdir/rtk.tar.gz" -C "$tmpdir" \
+	&& install -d "${HOME}/openclaw/extensions/rtk-rewrite" \
+	&& cp "$tmpdir/rtk-${RTK_VERSION#v}/openclaw/index.ts" "$tmpdir/rtk-${RTK_VERSION#v}/openclaw/openclaw.plugin.json" "${HOME}/openclaw/extensions/rtk-rewrite/" \
+	&& rm -rf "$tmpdir" \
 	&& ln -sf ${HOME}/openclaw/openclaw.mjs ${HOME}/.local/bin/openclaw \
 	&& echo 'export PATH="${HOME}/openclaw/node_modules/.bin:${PATH}"' >> ${HOME}/.bashrc \
 	&& echo '' >> ${HOME}/.bashrc
