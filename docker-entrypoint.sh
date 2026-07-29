@@ -22,6 +22,8 @@ if [[ -f "$CONFIG_PATH" ]]; then
     | .plugins.entries.lobster |= if has("enabled") then . else . + { enabled: true } end
     | .plugins.entries["google-meet"] |= (. // {})
     | .plugins.entries["google-meet"] |= if has("enabled") then . else . + { enabled: true } end
+    | .plugins.entries["rtk-rewrite"] |= (. // {})
+    | .plugins.entries["rtk-rewrite"] |= if has("enabled") then . else . + { enabled: true } end
   ' "$CONFIG_PATH" > "$tmpfile"
 else
   jq -n '{
@@ -30,6 +32,8 @@ else
         diffs: { enabled: true },
         lobster: { enabled: true },
         "google-meet": { enabled: true }
+        "google-meet": { enabled: true },
+        "rtk-rewrite": { enabled: true }
       }
     }
   }' > "$tmpfile"
