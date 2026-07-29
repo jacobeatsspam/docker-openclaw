@@ -31,7 +31,6 @@ else
       entries: {
         diffs: { enabled: true },
         lobster: { enabled: true },
-        "google-meet": { enabled: true }
         "google-meet": { enabled: true },
         "rtk-rewrite": { enabled: true }
       }
