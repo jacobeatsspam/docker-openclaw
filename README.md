@@ -20,5 +20,6 @@ On first boot, the image also seeds `plugins.entries.diffs.enabled=true`,
 settings are unset, so bundled diff-viewer, Lobster, Google Meet, and RTK
 command rewriting are available without interactive plugin installs.
 
-The RTK integration bundles the upstream OpenClaw plugin under
-`openclaw/extensions/rtk-rewrite` and installs the `rtk` binary into the image.
+The RTK integration installs the `rtk` binary into the image and fetches the
+matching upstream OpenClaw plugin files from the same RTK release tag into
+`openclaw/extensions/rtk-rewrite` during the build.

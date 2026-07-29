@@ -186,8 +186,6 @@ USER node
 ENV HOME="/home/node"
 WORKDIR "${HOME}"
 
-COPY --chown=node:node rtk-rewrite ${HOME}/rtk-rewrite
-
 # From this point, we specify ENV and write to .bashrc.
 # This way the exec call to openclaw has the values, and they are set when grabbing a shell.
 
@@ -264,8 +262,12 @@ RUN --mount=type=cache,id=docker-openclaw-pnpm-store-${OPENCLAW_TAG}-${TARGETARC
 		NODE_OPTIONS="$OPENCLAW_DOCKER_BUILD_NODE_OPTIONS" \
 		pnpm_config_verify_deps_before_run=false pnpm build:docker \
 	&& pnpm_config_verify_deps_before_run=false pnpm ui:build \
+	&& tmpdir="$(mktemp -d)" \
+	&& curl -fsSL "https://codeload.github.com/rtk-ai/rtk/tar.gz/refs/tags/${RTK_VERSION}" -o "$tmpdir/rtk.tar.gz" \
+	&& tar -xzf "$tmpdir/rtk.tar.gz" -C "$tmpdir" \
 	&& install -d "${HOME}/openclaw/extensions/rtk-rewrite" \
-	&& cp "${HOME}/rtk-rewrite/index.ts" "${HOME}/rtk-rewrite/openclaw.plugin.json" "${HOME}/openclaw/extensions/rtk-rewrite/" \
+	&& cp "$tmpdir/rtk-${RTK_VERSION#v}/openclaw/index.ts" "$tmpdir/rtk-${RTK_VERSION#v}/openclaw/openclaw.plugin.json" "${HOME}/openclaw/extensions/rtk-rewrite/" \
+	&& rm -rf "$tmpdir" \
 	&& ln -sf ${HOME}/openclaw/openclaw.mjs ${HOME}/.local/bin/openclaw \
 	&& echo 'export PATH="${HOME}/openclaw/node_modules/.bin:${PATH}"' >> ${HOME}/.bashrc \
 	&& echo '' >> ${HOME}/.bashrc
